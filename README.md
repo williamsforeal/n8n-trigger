@@ -16,7 +16,7 @@ This repository contains an n8n workflow setup with API triggers.
 
 2. **Copy environment variables:**
    ```bash
-   copy .env.example .env
+   cp .env.example .env
    ```
 
 3. **Start n8n:**
