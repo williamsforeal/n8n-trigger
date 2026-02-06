@@ -78,7 +78,8 @@ This document details the performance and reliability improvements made to the `
 
 1. **DoS Protection**: Payload size validation prevents memory exhaustion attacks
 2. **Timeout Protection**: Request timeout prevents resource exhaustion
-3. **Error Information Leakage**: Error messages sanitized while still useful for debugging
+3. **Error Information Sanitization**: Error messages sanitized to prevent information leakage about internal systems
+4. **Secure Error Logging**: Full error details logged server-side only, clients receive generic messages
 
 ## Code Quality Improvements
 
