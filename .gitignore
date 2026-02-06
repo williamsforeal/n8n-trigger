@@ -1,0 +1,14 @@
+# Environment variables
+.env
+
+# n8n data
+n8n_data/
+workflows/
+credentials/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
