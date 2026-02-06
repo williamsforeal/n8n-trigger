@@ -5,39 +5,42 @@ This repository contains an n8n workflow setup with API triggers.
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose installed
-- Node.js (for API trigger)
+- Node.js 18+ installed
 
 ### Running n8n
 
-1. **Copy environment variables:**
+1. **Install dependencies (first time only):**
    ```bash
-   cp .env.example .env
+   npm install
    ```
 
-2. **Start n8n:**
+2. **Copy environment variables:**
    ```bash
-   docker-compose up -d
+   copy .env.example .env
    ```
 
-3. **Access n8n:**
+3. **Start n8n:**
+   ```bash
+   npm start
+   ```
+
+4. **Access n8n:**
    - Open http://localhost:5678 in your browser
    - Create your account on first launch
 
-4. **Import workflow:**
+5. **Import workflow:**
    - In n8n, go to Workflows → Import from File
    - Select `api/N8N-Workflow.json`
 
 ### Stopping n8n
 
-```bash
-docker-compose down
-```
+Press `Ctrl+C` in the terminal where n8n is running
 
-### View logs
+### Alternative: Docker Setup
 
+If you prefer Docker, use:
 ```bash
-docker-compose logs -f n8n
+docker-compose up -d
 ```
 
 ## API Trigger
