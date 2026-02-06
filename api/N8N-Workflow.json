@@ -1,0 +1,482 @@
+{
+  "name": "Static Scaler v2 - Product Compositing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cb549f52-6787-4056-87a8-46c26a84efed",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "recordId",
+              "name": "adCopyRecordId",
+              "value": "={{ $json.query.recordId }}",
+              "type": "string"
+            },
+            {
+              "id": "headline",
+              "name": "headline",
+              "value": "={{ $json.body.headline }}",
+              "type": "string"
+            },
+            {
+              "id": "cta",
+              "name": "cta",
+              "value": "={{ $json.body.CTA }}",
+              "type": "string"
+            },
+            {
+              "id": "concept",
+              "name": "concept",
+              "value": "={{ $json.body.Concept }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "preserve-context",
+      "name": "Preserve Ad Copy Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": {
+          "__rl": true,
+          "value": "appvPrfjiuXIhdNuW",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblh0GaqQOpBVbCLP",
+          "mode": "list"
+        },
+        "recordId": "={{ $json.adCopyRecordId }}"
+      },
+      "id": "get-ad-copy",
+      "name": "Get Ad Copy",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [650, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "PLACEHOLDER",
+          "name": "Airtable Personal Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": {
+          "__rl": true,
+          "value": "appvPrfjiuXIhdNuW",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblBnVh4S8suptxct",
+          "mode": "list"
+        },
+        "recordId": "={{ $json.fields.Product[0] }}"
+      },
+      "id": "get-product",
+      "name": "Get Product Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [850, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "PLACEHOLDER",
+          "name": "Airtable Personal Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const productImages = $input.item.json.fields['Product Images'];\n\nif (!productImages || productImages.length === 0) {\n  throw new Error('No product images found - add images to Products table');\n}\n\nconst productImageUrl = productImages[0].url;\n\nreturn {\n  ...($input.item.json),\n  productImageUrl: productImageUrl,\n  productFilename: productImages[0].filename\n};"
+      },
+      "id": "extract-product-url",
+      "name": "Extract Product Image URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "pairedItem": {
+            "mode": "link"
+          }
+        }
+      },
+      "id": "loop-prompts",
+      "name": "Loop Over Prompts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prompts = [\n  $input.item.json.fields['Prompt 1'],\n  $input.item.json.fields['Prompt 2'],\n  $input.item.json.fields['Prompt 3']\n].filter(p => p && p.trim() !== '');\n\nif (prompts.length === 0) {\n  throw new Error('No prompts found in Ad Copy');\n}\n\nconst iteration = $input.context.noItemsLeft;\nconst totalItems = prompts.length;\nconst currentIndex = totalItems - iteration;\n\nconst currentPrompt = prompts[currentIndex];\nconst variant = ['A', 'B', 'C'][currentIndex];\n\nconst adCopyContext = $('Preserve Ad Copy Context').item.json;\nconst productContext = $('Extract Product Image URL').item.json;\n\nreturn {\n  ...adCopyContext,\n  ...productContext,\n  currentPrompt: currentPrompt,\n  variant: variant,\n  promptIndex: currentIndex + 1\n};"
+      },
+      "id": "format-prompt",
+      "name": "Format Higgsfield Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=YOUR_HIGGSFIELD_API_ENDPOINT",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"{{ $json.currentPrompt }}\",\n  \"width\": 1024,\n  \"height\": 1024,\n  \"model\": \"fal-ai/flux/dev\"\n}",
+        "options": {}
+      },
+      "id": "generate-bg",
+      "name": "Generate Background",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER",
+          "name": "Higgsfield API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.image_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-bg",
+      "name": "Download Background",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "static-scaler-v2",
+        "fileName": "=generated/{{ $('Preserve Ad Copy Context').item.json.adCopyRecordId }}/background-{{ $('Format Higgsfield Prompt').item.json.variant }}.png",
+        "binaryData": true,
+        "additionalFields": {
+          "acl": "public-read",
+          "contentType": "image/png"
+        }
+      },
+      "id": "upload-bg-s3",
+      "name": "Upload Background to S3",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [2050, 300],
+      "credentials": {
+        "s3": {
+          "id": "PLACEHOLDER",
+          "name": "AWS S3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const bucket = 'static-scaler-v2';\nconst region = 'us-east-1';\nconst key = $json.key || $json.Key;\n\nconst s3Url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;\n\nreturn {\n  ...$json,\n  s3BackgroundUrl: s3Url,\n  s3BackgroundKey: key\n};"
+      },
+      "id": "format-bg-url",
+      "name": "Format Background S3 URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "designType": "custom",
+        "template": {
+          "__rl": true,
+          "value": "YOUR_CANVA_TEMPLATE_ID",
+          "mode": "id"
+        },
+        "designData": {
+          "designDataValues": [
+            {
+              "key": "background_image",
+              "value": "={{ $json.s3BackgroundUrl }}"
+            },
+            {
+              "key": "product_image",
+              "value": "={{ $('Extract Product Image URL').item.json.productImageUrl }}"
+            },
+            {
+              "key": "headline",
+              "value": "={{ $('Preserve Ad Copy Context').item.json.headline }}"
+            },
+            {
+              "key": "cta",
+              "value": "={{ $('Preserve Ad Copy Context').item.json.cta }}"
+            }
+          ]
+        }
+      },
+      "id": "create-canva",
+      "name": "Create Canva Design",
+      "type": "n8n-nodes-base.canva",
+      "typeVersion": 1,
+      "position": [2450, 300],
+      "credentials": {
+        "canvaOAuth2Api": {
+          "id": "PLACEHOLDER",
+          "name": "Canva OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-canva",
+      "name": "Wait for Canva",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "export",
+        "designId": "={{ $json.id }}",
+        "format": "png"
+      },
+      "id": "export-canva",
+      "name": "Export Canva Design",
+      "type": "n8n-nodes-base.canva",
+      "typeVersion": 1,
+      "position": [2850, 300],
+      "credentials": {
+        "canvaOAuth2Api": {
+          "id": "PLACEHOLDER",
+          "name": "Canva OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.export_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-final",
+      "name": "Download Final Ad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "static-scaler-v2",
+        "fileName": "=finals/{{ $('Preserve Ad Copy Context').item.json.adCopyRecordId }}/ad-{{ $('Format Higgsfield Prompt').item.json.variant }}.png",
+        "binaryData": true,
+        "additionalFields": {
+          "acl": "public-read",
+          "contentType": "image/png"
+        }
+      },
+      "id": "upload-final-s3",
+      "name": "Upload Final Ad to S3",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [3250, 300],
+      "credentials": {
+        "s3": {
+          "id": "PLACEHOLDER",
+          "name": "AWS S3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const bucket = 'static-scaler-v2';\nconst region = 'us-east-1';\nconst key = $json.key || $json.Key;\n\nconst s3Url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;\n\nconst adCopyContext = $('Preserve Ad Copy Context').item.json;\nconst promptContext = $('Format Higgsfield Prompt').item.json;\n\nreturn {\n  adCopyRecordId: adCopyContext.adCopyRecordId,\n  variant: promptContext.variant,\n  finalAdUrl: s3Url,\n  s3Key: key,\n  s3Bucket: bucket,\n  headline: adCopyContext.headline,\n  cta: adCopyContext.cta,\n  promptUsed: promptContext.currentPrompt,\n  model: 'fal-ai/flux/dev',\n  width: 1024,\n  height: 1024,\n  status: 'Generated'\n};"
+      },
+      "id": "format-metadata",
+      "name": "Format Final Ad Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appvPrfjiuXIhdNuW",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblt1dje94IcK4kT2",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ad Sets": "=Generated {{ $now.format('yyyy-MM-dd') }}",
+            "Variant": "={{ $json.variant }}",
+            "Prompt Used": "={{ $json.promptUsed }}",
+            "Model": "={{ $json.model }}",
+            "Width": "={{ $json.width }}",
+            "Height": "={{ $json.height }}",
+            "Status": "={{ $json.status }}",
+            "s3_key": "={{ $json.s3Key }}",
+            "s3_url": "={{ $json.finalAdUrl }}",
+            "bucket": "={{ $json.s3Bucket }}",
+            "product_slug": "palmaura"
+          }
+        }
+      },
+      "id": "create-image-record",
+      "name": "Create Image Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [3650, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "PLACEHOLDER",
+          "name": "Airtable Personal Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appvPrfjiuXIhdNuW",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblt1dje94IcK4kT2",
+          "mode": "list"
+        },
+        "recordId": "={{ $json.id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ad Copy": "={{ [$('Format Final Ad Metadata').item.json.adCopyRecordId] }}"
+          }
+        }
+      },
+      "id": "link-to-ad-copy",
+      "name": "Link to Ad Copy",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [3850, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "PLACEHOLDER",
+          "name": "Airtable Personal Access Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Preserve Ad Copy Context", "type": "main", "index": 0}]]
+    },
+    "Preserve Ad Copy Context": {
+      "main": [[{"node": "Get Ad Copy", "type": "main", "index": 0}]]
+    },
+    "Get Ad Copy": {
+      "main": [[{"node": "Get Product Record", "type": "main", "index": 0}]]
+    },
+    "Get Product Record": {
+      "main": [[{"node": "Extract Product Image URL", "type": "main", "index": 0}]]
+    },
+    "Extract Product Image URL": {
+      "main": [[{"node": "Loop Over Prompts", "type": "main", "index": 0}]]
+    },
+    "Loop Over Prompts": {
+      "main": [[{"node": "Format Higgsfield Prompt", "type": "main", "index": 0}]]
+    },
+    "Format Higgsfield Prompt": {
+      "main": [[{"node": "Generate Background", "type": "main", "index": 0}]]
+    },
+    "Generate Background": {
+      "main": [[{"node": "Download Background", "type": "main", "index": 0}]]
+    },
+    "Download Background": {
+      "main": [[{"node": "Upload Background to S3", "type": "main", "index": 0}]]
+    },
+    "Upload Background to S3": {
+      "main": [[{"node": "Format Background S3 URL", "type": "main", "index": 0}]]
+    },
+    "Format Background S3 URL": {
+      "main": [[{"node": "Create Canva Design", "type": "main", "index": 0}]]
+    },
+    "Create Canva Design": {
+      "main": [[{"node": "Wait for Canva", "type": "main", "index": 0}]]
+    },
+    "Wait for Canva": {
+      "main": [[{"node": "Export Canva Design", "type": "main", "index": 0}]]
+    },
+    "Export Canva Design": {
+      "main": [[{"node": "Download Final Ad", "type": "main", "index": 0}]]
+    },
+    "Download Final Ad": {
+      "main": [[{"node": "Upload Final Ad to S3", "type": "main", "index": 0}]]
+    },
+    "Upload Final Ad to S3": {
+      "main": [[{"node": "Format Final Ad Metadata", "type": "main", "index": 0}]]
+    },
+    "Format Final Ad Metadata": {
+      "main": [[{"node": "Create Image Record", "type": "main", "index": 0}]]
+    },
+    "Create Image Record": {
+      "main": [[{"node": "Link to Ad Copy", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-02-02T00:00:00.000Z",
+  "versionId": "workflow-v2"
+}
